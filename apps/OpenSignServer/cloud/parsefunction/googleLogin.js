@@ -46,6 +46,9 @@ export default async function googleLogin(request) {
   userQuery.equalTo('email', email);
   let user = await userQuery.first({ useMasterKey: true });
 
+  // Generate a one-time password for session creation
+  const tempPassword = crypto.randomBytes(32).toString('hex');
+
   if (!user) {
     // Create new user
     user = new Parse.User();
@@ -53,25 +56,24 @@ export default async function googleLogin(request) {
     user.set('email', email);
     user.set('name', name);
     user.set('emailVerified', true);
-    user.set('password', crypto.randomBytes(32).toString('hex'));
+    user.set('password', tempPassword);
     await user.signUp(null, { useMasterKey: true });
-  }
-
-  if (!user.get('emailVerified')) {
-    user.set('emailVerified', true);
+  } else {
+    // Set temp password on existing user so we can log in
+    user.set('password', tempPassword);
+    if (!user.get('emailVerified')) {
+      user.set('emailVerified', true);
+    }
     await user.save(null, { useMasterKey: true });
   }
 
-  // Create a session directly
-  const sessionToken = 'r:' + crypto.randomBytes(24).toString('hex');
-  const Session = Parse.Object.extend('_Session');
-  const session = new Session();
-  session.set('user', user);
-  session.set('sessionToken', sessionToken);
-  session.set('createdWith', { action: 'login', authProvider: 'google' });
-  session.set('restricted', false);
-  session.set('expiresAt', new Date(Date.now() + 365 * 24 * 60 * 60 * 1000));
-  await session.save(null, { useMasterKey: true });
+  // Log in with the temp password to create a proper session
+  const loggedInUser = await Parse.User.logIn(email, tempPassword);
 
-  return { sessionToken, ...user.toJSON() };
+  // Restore a strong random password so the temp one can't be reused
+  const finalPassword = crypto.randomBytes(32).toString('hex');
+  loggedInUser.set('password', finalPassword);
+  await loggedInUser.save(null, { useMasterKey: true });
+
+  return { sessionToken: loggedInUser.getSessionToken(), ...loggedInUser.toJSON() };
 }
