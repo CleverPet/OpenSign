@@ -86,6 +86,9 @@ if (smtpenable) {
     isMailAdapter = false;
     console.log(`Please provide valid SMTP credentials: ${err}`);
   }
+} else if (process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID) {
+  isMailAdapter = true;
+  console.log('Using AgentMail for email delivery');
 } else if (process.env.MAILGUN_API_KEY) {
   try {
     const mailgun = new Mailgun(formData);

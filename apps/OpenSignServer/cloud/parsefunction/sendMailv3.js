@@ -63,6 +63,27 @@ async function sendMailProvider(req) {
         }
         return { status: 'success' };
       }
+    } else if (process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID) {
+      const agentmailRes = await axios.post(
+        `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
+        {
+          to: Array.isArray(req.params.recipient) ? req.params.recipient : [req.params.recipient],
+          subject: req.params.subject,
+          body_text: req.params.text || '',
+          body_html: req.params?.html ? req.params.html + reportMsg : undefined,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+      console.log('agentmail res: ', agentmailRes?.status);
+      if (extUserId) {
+        await updateMailCount(extUserId);
+      }
+      return { status: 'success' };
     } else {
       if (mailgunApiKey) {
         const res = await mailgunClient.messages.create(mailgunDomain, messageParams);
