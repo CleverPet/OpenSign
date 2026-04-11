@@ -153,26 +153,18 @@ function Login() {
     setThirdpartyLoader(true);
     try {
       const idToken = credentialResponse.credential;
-      // Decode the JWT to get the Google user ID and email
-      const payload = JSON.parse(atob(idToken.split(".")[1]));
-
-      // Use Parse Server's built-in Google auth adapter
-      const user = await Parse.User.logInWith("google", {
-        authData: {
-          id: payload.sub,
-          id_token: idToken
-        }
+      // Use our googleLogin cloud function which handles:
+      // - Token verification
+      // - Finding existing user by email and linking Google auth
+      // - Creating new user if none exists
+      // - Domain restriction via GOOGLE_SSO_ALLOWED_DOMAIN
+      const result = await Parse.Cloud.run("googleLogin", {
+        id_token: idToken,
+        access_token: idToken
       });
 
-      if (user) {
-        // Update user profile if needed
-        if (!user.get("name") && payload.name) {
-          user.set("name", payload.name);
-          user.set("emailVerified", true);
-          if (!user.get("email")) user.set("email", payload.email);
-          await user.save(null, { sessionToken: user.getSessionToken() });
-        }
-        await thirdpartyLoginfn(user.getSessionToken());
+      if (result?.sessionToken) {
+        await thirdpartyLoginfn(result.sessionToken);
       } else {
         showToast("danger", t("something-went-wrong-mssg"));
         setThirdpartyLoader(false);

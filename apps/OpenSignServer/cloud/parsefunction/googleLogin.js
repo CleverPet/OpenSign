@@ -1,23 +1,36 @@
 import axios from 'axios';
 
 export default async function googleLogin(request) {
-  const { id_token, access_token } = request.params;
+  const { id_token } = request.params;
 
   if (!id_token) {
     throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'id_token is required');
   }
 
-  // Verify the token and get user info
-  const { data: googleUser } = await axios.get(
-    'https://www.googleapis.com/oauth2/v3/userinfo',
-    { headers: { Authorization: `Bearer ${access_token}` } }
-  );
-
-  if (!googleUser?.email) {
-    throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Could not get email from Google');
+  // Verify the id_token with Google's tokeninfo endpoint
+  let tokenInfo;
+  try {
+    const { data } = await axios.get(
+      `https://oauth2.googleapis.com/tokeninfo?id_token=${id_token}`
+    );
+    tokenInfo = data;
+  } catch (err) {
+    throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid Google id_token');
   }
 
-  const email = googleUser.email.toLowerCase();
+  // Verify the token was issued for our client
+  const expectedClientId = process.env.GOOGLE_CLIENT_ID;
+  if (expectedClientId && tokenInfo.aud !== expectedClientId) {
+    throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Token was not issued for this application');
+  }
+
+  if (!tokenInfo.email) {
+    throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Could not get email from Google token');
+  }
+
+  const email = tokenInfo.email.toLowerCase();
+  const googleSub = tokenInfo.sub;
+  const name = tokenInfo.name || '';
 
   // Restrict to allowed domain if configured
   const allowedDomain = process.env.GOOGLE_SSO_ALLOWED_DOMAIN;
@@ -34,36 +47,38 @@ export default async function googleLogin(request) {
   const existingUser = await userQuery.first({ useMasterKey: true });
 
   if (existingUser) {
-    // Link Google auth data and return session
+    // Link Google auth data to existing user
     existingUser.set('authData', {
-      google: { id: googleUser.sub, id_token, access_token }
+      google: { id: googleSub, id_token }
     });
+    if (!existingUser.get('emailVerified')) {
+      existingUser.set('emailVerified', true);
+    }
     await existingUser.save(null, { useMasterKey: true });
 
-    // Create a new session
+    // Create a session for this user
     const sessionToken = existingUser.getSessionToken();
     if (sessionToken) {
       return { sessionToken, ...existingUser.toJSON() };
     }
 
-    // If no session token, log in via authData
+    // Generate a new session via logInWith
     const user = await Parse.User.logInWith('google', {
-      authData: { id: googleUser.sub, id_token, access_token }
+      authData: { id: googleSub, id_token }
     });
     return { sessionToken: user.getSessionToken(), ...user.toJSON() };
   }
 
-  // Create new user via Google auth
+  // No existing user — create one
   const user = new Parse.User();
   user.set('username', email);
   user.set('email', email);
-  user.set('name', googleUser.name || '');
+  user.set('name', name);
   user.set('emailVerified', true);
   user.set('authData', {
-    google: { id: googleUser.sub, id_token, access_token }
+    google: { id: googleSub, id_token }
   });
 
-  // Generate a random password (user will auth via Google, not password)
   const crypto = await import('node:crypto');
   user.set('password', crypto.randomBytes(32).toString('hex'));
 
