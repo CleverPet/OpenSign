@@ -70,10 +70,5 @@ export default async function googleLogin(request) {
   // Log in with the temp password to create a proper session
   const loggedInUser = await Parse.User.logIn(email, tempPassword);
 
-  // Restore a strong random password so the temp one can't be reused
-  const finalPassword = crypto.randomBytes(32).toString('hex');
-  loggedInUser.set('password', finalPassword);
-  await loggedInUser.save(null, { useMasterKey: true });
-
   return { sessionToken: loggedInUser.getSessionToken(), ...loggedInUser.toJSON() };
 }
