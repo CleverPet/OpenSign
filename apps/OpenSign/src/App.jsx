@@ -21,6 +21,7 @@ import { serverUrl_fn } from "./constant/appinfo";
 import DocSuccessPage from "./pages/DocSuccessPage";
 import DragProvider from "./components/DragProivder";
 import Title from "./components/Title";
+const PublicSign = lazyWithRetry(() => import("./pages/PublicSign"));
 const DebugPdf = lazyWithRetry(() => import("./pages/DebugPdf"));
 const ForgetPassword = lazyWithRetry(() => import("./pages/ForgetPassword"));
 const GuestLogin = lazyWithRetry(() => import("./pages/GuestLogin"));
@@ -83,6 +84,10 @@ function App() {
             <Route
               path="/login/:base64url"
               element={<Lazy Page={GuestLogin} />}
+            />
+            <Route
+              path="/public/sign/:templateId"
+              element={<Lazy Page={PublicSign} />}
             />
             <Route path="/debugpdf" element={<Lazy Page={DebugPdf} />} />
               <Route
