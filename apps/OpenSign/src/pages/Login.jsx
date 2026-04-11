@@ -150,35 +150,41 @@ function Login() {
   };
 
   const handleGoogleLogin = useGoogleLogin({
-    flow: "auth-code",
-    onSuccess: async (codeResponse) => {
+    flow: "implicit",
+    onSuccess: async (tokenResponse) => {
       setThirdpartyLoader(true);
       try {
-        const tokenRes = await axios.post(
-          "https://oauth2.googleapis.com/token",
-          {
-            code: codeResponse.code,
-            client_id: appInfo.googleClientId,
-            client_secret: process.env.REACT_APP_GOOGLE_CLIENT_SECRET || "",
-            redirect_uri: "postmessage",
-            grant_type: "authorization_code"
-          }
+        // Get user info from Google
+        const { data: googleUser } = await axios.get(
+          "https://www.googleapis.com/oauth2/v3/userinfo",
+          { headers: { Authorization: `Bearer ${tokenResponse.access_token}` } }
         );
-        const { id_token, access_token } = tokenRes.data;
-        // Use Parse's built-in Google auth adapter
-        const user = await Parse.Cloud.run("googleLogin", {
-          id_token,
-          access_token
+
+        // Use Parse Server's built-in Google auth adapter
+        const user = await Parse.User.logInWith("google", {
+          authData: {
+            id: googleUser.sub,
+            access_token: tokenResponse.access_token,
+            id_token: tokenResponse.access_token
+          }
         });
-        if (user?.sessionToken) {
-          await thirdpartyLoginfn(user.sessionToken);
+
+        if (user) {
+          // Update user profile if missing
+          if (!user.get("name") && googleUser.name) {
+            user.set("name", googleUser.name);
+            user.set("emailVerified", true);
+            if (!user.get("email")) user.set("email", googleUser.email);
+            await user.save(null, { sessionToken: user.getSessionToken() });
+          }
+          await thirdpartyLoginfn(user.getSessionToken());
         } else {
           showToast("danger", t("something-went-wrong-mssg"));
           setThirdpartyLoader(false);
         }
       } catch (error) {
         console.error("Google login error:", error);
-        showToast("danger", error?.response?.data?.error || error.message || t("something-went-wrong-mssg"));
+        showToast("danger", error.message || t("something-went-wrong-mssg"));
         setThirdpartyLoader(false);
       }
     },
