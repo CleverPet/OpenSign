@@ -7,8 +7,9 @@ import { Provider } from "react-redux";
 import { store } from "./redux/store";
 import Parse from "parse";
 import "./polyfills";
-import { serverUrl_fn } from "./constant/appinfo";
+import { serverUrl_fn, appInfo } from "./constant/appinfo";
 import "./i18n";
+import { GoogleOAuthProvider } from "@react-oauth/google";
 
 const appId =
   import.meta.env.VITE_APPID || process.env.REACT_APP_APPID || "opensign";
@@ -27,9 +28,17 @@ if (savedTheme === "dark") {
 
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
+const googleClientId = appInfo.googleClientId;
+
 root.render(
   <Provider store={store}>
-    <App />
+    {googleClientId ? (
+      <GoogleOAuthProvider clientId={googleClientId}>
+        <App />
+      </GoogleOAuthProvider>
+    ) : (
+      <App />
+    )}
   </Provider>
 );
 

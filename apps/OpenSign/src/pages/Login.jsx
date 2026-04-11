@@ -21,6 +21,7 @@ import {
 import Loader from "../primitives/Loader";
 import { useTranslation } from "react-i18next";
 import SelectLanguage from "../components/pdf/SelectLanguage";
+import { useGoogleLogin } from "@react-oauth/google";
 
 function Login() {
   const appName =
@@ -147,6 +148,46 @@ function Login() {
   const setThirdpartyLoader = (value) => {
     setState({ ...state, thirdpartyLoader: value });
   };
+
+  const handleGoogleLogin = useGoogleLogin({
+    flow: "auth-code",
+    onSuccess: async (codeResponse) => {
+      setThirdpartyLoader(true);
+      try {
+        const tokenRes = await axios.post(
+          "https://oauth2.googleapis.com/token",
+          {
+            code: codeResponse.code,
+            client_id: appInfo.googleClientId,
+            client_secret: process.env.REACT_APP_GOOGLE_CLIENT_SECRET || "",
+            redirect_uri: "postmessage",
+            grant_type: "authorization_code"
+          }
+        );
+        const { id_token, access_token } = tokenRes.data;
+        // Use Parse's built-in Google auth adapter
+        const user = await Parse.Cloud.run("googleLogin", {
+          id_token,
+          access_token
+        });
+        if (user?.sessionToken) {
+          await thirdpartyLoginfn(user.sessionToken);
+        } else {
+          showToast("danger", t("something-went-wrong-mssg"));
+          setThirdpartyLoader(false);
+        }
+      } catch (error) {
+        console.error("Google login error:", error);
+        showToast("danger", error?.response?.data?.error || error.message || t("something-went-wrong-mssg"));
+        setThirdpartyLoader(false);
+      }
+    },
+    onError: (error) => {
+      console.error("Google login error:", error);
+      showToast("danger", t("something-went-wrong-mssg"));
+    },
+    hosted_domain: "getcleverpet.com"
+  });
 
   const thirdpartyLoginfn = async (sessionToken) => {
     const baseUrl = localStorage.getItem("baseUrl");
@@ -508,7 +549,7 @@ function Login() {
                           </div>
                       </div>
                     </fieldset>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-center text-xs font-bold mt-2">
+                    <div className="grid grid-cols-1 gap-2 text-center text-xs font-bold mt-2">
                       <button
                         type="submit"
                         className="op-btn op-btn-primary"
@@ -516,6 +557,29 @@ function Login() {
                       >
                         {state.loading ? t("loading") : t("login")}
                       </button>
+                      {appInfo.googleClientId && (
+                        <>
+                          <div className="flex items-center my-1">
+                            <hr className="flex-grow border-base-300" />
+                            <span className="px-2 text-xs text-gray-500 font-normal">{t("or") || "or"}</span>
+                            <hr className="flex-grow border-base-300" />
+                          </div>
+                          <button
+                            type="button"
+                            className="op-btn op-btn-outline gap-2"
+                            onClick={() => handleGoogleLogin()}
+                            disabled={state.thirdpartyLoader}
+                          >
+                            <svg width="18" height="18" viewBox="0 0 18 18">
+                              <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.259h2.908c1.702-1.567 2.684-3.875 2.684-6.615Z"/>
+                              <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18Z"/>
+                              <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.997 8.997 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332Z"/>
+                              <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58Z"/>
+                            </svg>
+                            {state.thirdpartyLoader ? t("loading") : "Sign in with Google"}
+                          </button>
+                        </>
+                      )}
                     </div>
                   </form>
                 </div>
