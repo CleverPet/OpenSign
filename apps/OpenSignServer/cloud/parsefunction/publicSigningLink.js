@@ -62,7 +62,7 @@ export async function createPublicSigningDoc(request) {
     await contact.save(null, { useMasterKey: true });
   }
 
-  // Build placeholders with signer info
+  // Build placeholders with signer info — fill in signerObjId and signerPtr
   const templatePlaceholders = template.get('Placeholders') || [];
   const placeholders = templatePlaceholders.map((p) => {
     if (p.Role !== 'prefill') {
@@ -72,6 +72,12 @@ export async function createPublicSigningDoc(request) {
         name: signerName,
         Id: crypto.randomUUID(),
         objectId: contact.id,
+        signerObjId: contact.id,
+        signerPtr: {
+          __type: 'Pointer',
+          className: 'contracts_Contactbook',
+          objectId: contact.id,
+        },
       };
     }
     return p;
