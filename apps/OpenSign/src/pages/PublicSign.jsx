@@ -135,7 +135,7 @@ function PublicSign() {
         )}
 
         <p className="text-xs text-center text-gray-400 mt-6">
-          Powered by OpenSign
+          Powered by FluentPet
         </p>
       </div>
     </div>

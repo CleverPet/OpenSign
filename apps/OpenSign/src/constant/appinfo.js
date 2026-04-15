@@ -20,7 +20,7 @@ export const appInfo = {
     ? `${process.env.REACT_APP_GOOGLECLIENTID}`
     : "",
   metaDescription:
-    "The fastest way to sign PDFs & request signatures from others.",
+    "FluentPet document signing",
   settings: [
     {
       role: "contracts_Admin",

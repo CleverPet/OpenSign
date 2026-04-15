@@ -25,7 +25,7 @@ import { GoogleLogin } from "@react-oauth/google";
 
 function Login() {
   const appName =
-    "OpenSign™";
+    "FluentPet";
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const location = useLocation();
