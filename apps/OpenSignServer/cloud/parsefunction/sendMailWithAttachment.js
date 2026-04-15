@@ -161,6 +161,12 @@ async function sendMailProvider(params) {
               return { status: 'success' };
             }
           } else if (process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID) {
+            // Build agentmail attachments from file buffers
+            const agentAttachments = attachment.map(att => ({
+              filename: att.filename,
+              content: (att.content || att.data).toString('base64'),
+              content_type: 'application/pdf',
+            }));
             const agentmailRes = await axios.post(
               `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
               {
@@ -168,6 +174,7 @@ async function sendMailProvider(params) {
                 subject: params.subject,
                 body_text: params.text || '',
                 body_html: params?.html ? params.html + reportMsg : undefined,
+                attachments: agentAttachments,
               },
               { headers: { Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`, 'Content-Type': 'application/json' } }
             );
