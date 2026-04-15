@@ -64,10 +64,17 @@ async function sendMailProvider(req) {
         return { status: 'success' };
       }
     } else if (process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID) {
+      // Normalize "Name <email>" to bare email for agentmail
+      let recipients = Array.isArray(req.params.recipient) ? req.params.recipient : [req.params.recipient];
+      recipients = recipients.map(r => {
+        if (typeof r === 'object') return r.email || r.to || String(r);
+        const match = String(r).match(/<([^>]+)>/);
+        return match ? match[1] : String(r).trim();
+      });
       const agentmailRes = await axios.post(
         `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
         {
-          to: Array.isArray(req.params.recipient) ? req.params.recipient : [req.params.recipient],
+          to: recipients,
           subject: req.params.subject,
           body_text: req.params.text || '',
           body_html: req.params?.html ? req.params.html + reportMsg : undefined,

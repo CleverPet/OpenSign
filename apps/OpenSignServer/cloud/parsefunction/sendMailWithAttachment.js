@@ -167,9 +167,14 @@ async function sendMailProvider(params) {
               content: (att.content || att.data).toString('base64'),
               content_type: 'application/pdf',
             }));
-            // Normalize recipient to array of strings
+            // Normalize recipient to array of bare email strings
+            // OpenSign sends "Name <email>" format — extract just the email
             let recipients = Array.isArray(params.recipient) ? params.recipient : [params.recipient];
-            recipients = recipients.map(r => typeof r === 'object' ? (r.email || r.to || String(r)) : String(r));
+            recipients = recipients.map(r => {
+              if (typeof r === 'object') return r.email || r.to || String(r);
+              const match = String(r).match(/<([^>]+)>/);
+              return match ? match[1] : String(r).trim();
+            });
             try {
               const agentmailRes = await axios.post(
                 `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
