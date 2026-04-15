@@ -405,7 +405,15 @@ async function PDF(req) {
         passphrase = _resDoc?.ExtUserPtr?.TenantId?.PfxFile?.password;
       }
       const pfx = { name: pfxname, passphrase: passphrase };
-      const P12Buffer = Buffer.from(pfxFile, 'base64');
+      let P12Buffer;
+      // If PFX_FILE_PATH is set, read from disk instead of base64 env var
+      if (process.env.PFX_FILE_PATH && fs.existsSync(process.env.PFX_FILE_PATH)) {
+        P12Buffer = fs.readFileSync(process.env.PFX_FILE_PATH);
+      } else if (pfxFile) {
+        P12Buffer = Buffer.from(pfxFile, 'base64');
+      } else {
+        throw new Error('No PFX certificate configured. Set PFX_BASE64 or PFX_FILE_PATH.');
+      }
       fs.writeFileSync(pfxname, P12Buffer);
       const UserPtr = { __type: 'Pointer', className: className, objectId: signUser.objectId };
       const obj = { UserPtr: UserPtr, SignedUrl: '', Activity: 'Signed', ipAddress: userIP };
