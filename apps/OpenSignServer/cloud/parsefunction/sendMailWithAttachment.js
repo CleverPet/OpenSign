@@ -170,11 +170,13 @@ async function sendMailProvider(params) {
             // Normalize recipient to array of bare email strings
             // OpenSign sends "Name <email>" format — extract just the email
             let recipients = Array.isArray(params.recipient) ? params.recipient : [params.recipient];
+            console.log('agentmail raw recipient:', JSON.stringify(params.recipient));
             recipients = recipients.map(r => {
               if (typeof r === 'object') return r.email || r.to || String(r);
               const match = String(r).match(/<([^>]+)>/);
               return match ? match[1] : String(r).trim();
             });
+            console.log('agentmail normalized to:', JSON.stringify(recipients));
             try {
               const agentmailRes = await axios.post(
                 `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
@@ -251,10 +253,17 @@ async function sendMailProvider(params) {
           return { status: 'success' };
         }
       } else if (process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID) {
+        let rcpts2 = Array.isArray(params.recipient) ? params.recipient : [params.recipient];
+        rcpts2 = rcpts2.map(r => {
+          if (typeof r === 'object') return r.email || r.to || String(r);
+          const m = String(r).match(/<([^>]+)>/);
+          return m ? m[1] : String(r).trim();
+        });
+        console.log('agentmail (no-attachment) to:', JSON.stringify(rcpts2));
         const agentmailRes = await axios.post(
           `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
           {
-            to: Array.isArray(params.recipient) ? params.recipient : [params.recipient],
+            to: rcpts2,
             subject: params.subject,
             body_text: params.text || '',
             body_html: params?.html ? params.html + reportMsg : undefined,
