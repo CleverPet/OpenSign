@@ -5,6 +5,18 @@ import Mailgun from 'mailgun.js';
 import { appName, smtpenable, smtpsecure, updateMailCount } from '../../Utils.js';
 import { createTransport } from 'nodemailer';
 import axios from 'axios';
+// Normalize email recipients for agentmail: handles "Name <email>", comma-separated strings, arrays
+function normalizeRecipients(recipient) {
+  let list = Array.isArray(recipient) ? recipient : [recipient];
+  list = list.flatMap(r => String(r).split(','));
+  return list.map(r => {
+    r = String(r).trim();
+    if (typeof r === 'object') return r.email || r.to || String(r);
+    const match = r.match(/<([^>]+)>/);
+    return match ? match[1].trim() : r;
+  }).filter(Boolean);
+}
+
 async function sendMailProvider(req) {
   const app = appName;
   const extUserId = req.params?.extUserId || '';
@@ -64,13 +76,9 @@ async function sendMailProvider(req) {
         return { status: 'success' };
       }
     } else if (process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID) {
-      // Normalize "Name <email>" to bare email for agentmail
-      let recipients = Array.isArray(req.params.recipient) ? req.params.recipient : [req.params.recipient];
-      recipients = recipients.map(r => {
-        if (typeof r === 'object') return r.email || r.to || String(r);
-        const match = String(r).match(/<([^>]+)>/);
-        return match ? match[1] : String(r).trim();
-      });
+      // Normalize comma-separated, "Name <email>", etc. to bare email array
+      const recipients = normalizeRecipients(req.params.recipient);
+      console.log('agentmail (v3) to:', JSON.stringify(recipients));
       const agentmailRes = await axios.post(
         `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
         {
