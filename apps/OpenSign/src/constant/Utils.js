@@ -841,20 +841,23 @@ export const signPdfFun = async (
     }
 
     let base64Sign = getSignature?.SignUrl;
-    //check https type signature (default signature exist) then convert in base64
-    const isUrl = base64Sign.includes("https");
-    if (isUrl) {
-      try {
-        base64Sign = await fetchImageBase64(base64Sign);
-      } catch (e) {
-        console.log("error", e);
-        return { status: "error", message: "something went wrong." };
+    let suffixbase64 = "";
+    if (base64Sign) {
+      //check https type signature (default signature exist) then convert in base64
+      const isUrl = base64Sign.includes("https");
+      if (isUrl) {
+        try {
+          base64Sign = await fetchImageBase64(base64Sign);
+        } catch (e) {
+          console.log("error", e);
+          return { status: "error", message: "something went wrong." };
+        }
       }
+      //change image width and height to 300/120 in png base64
+      const imagebase64 = await changeImageWH(base64Sign);
+      //remove suffiix of base64 (without type)
+      suffixbase64 = imagebase64 && imagebase64.split(",").pop();
     }
-    //change image width and height to 300/120 in png base64
-    const imagebase64 = await changeImageWH(base64Sign);
-    //remove suffiix of base64 (without type)
-    const suffixbase64 = imagebase64 && imagebase64.split(",").pop();
 
     const params = {
       pdfFile: base64Url,
