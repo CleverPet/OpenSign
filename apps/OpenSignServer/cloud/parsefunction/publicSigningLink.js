@@ -125,35 +125,3 @@ export async function createPublicSigningDoc(request) {
     signingUrl: `/login/${encoded}`,
   };
 }
-
-export async function debugPfx(request) {
-  const fs = await import('node:fs');
-  const path = process.env.PFX_FILE_PATH || 'not set';
-  const base64Len = (process.env.PFX_BASE64 || '').length;
-  const passphrase = process.env.PASS_PHRASE || 'not set';
-  
-  let fileExists = false;
-  let fileSize = 0;
-  try {
-    const stat = fs.statSync(path);
-    fileExists = true;
-    fileSize = stat.size;
-  } catch(e) {}
-  
-  // Also check CWD and list files
-  const cwd = process.cwd();
-  let cwdFiles = [];
-  try {
-    cwdFiles = fs.readdirSync(cwd).filter(f => f.includes('pfx') || f.includes('cert') || f.includes('sign'));
-  } catch(e) {}
-  
-  return {
-    pfxFilePath: path,
-    pfxFileExists: fileExists,
-    pfxFileSize: fileSize,
-    pfxBase64Length: base64Len,
-    passphrase: passphrase ? 'set' : 'not set',
-    cwd,
-    cwdFiles,
-  };
-}
