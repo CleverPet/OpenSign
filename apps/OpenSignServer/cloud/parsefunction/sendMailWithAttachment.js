@@ -161,21 +161,41 @@ async function sendMailProvider(params) {
               return { status: 'success' };
             }
           } else if (process.env.AGENTMAIL_API_KEY && process.env.AGENTMAIL_INBOX_ID) {
-            // Send without attachments first (agentmail may reject large payloads)
+            // Build agentmail payload with attachments
+            const agentAttachments = attachment.map(att => ({
+              filename: att.filename,
+              content: (att.content || att.data).toString('base64'),
+              content_type: 'application/pdf',
+            }));
+            // Normalize recipient to array of strings
+            let recipients = Array.isArray(params.recipient) ? params.recipient : [params.recipient];
+            recipients = recipients.map(r => typeof r === 'object' ? (r.email || r.to || String(r)) : String(r));
             try {
               const agentmailRes = await axios.post(
                 `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
                 {
-                  to: Array.isArray(params.recipient) ? params.recipient : [params.recipient],
+                  to: recipients,
                   subject: params.subject,
-                  body_text: params.text || 'Document signed',
+                  body_text: params.text || 'Your document has been signed.',
                   body_html: params?.html ? params.html + reportMsg : undefined,
+                  attachments: agentAttachments,
                 },
                 { headers: { Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`, 'Content-Type': 'application/json' } }
               );
-              console.log('agentmail res: ', agentmailRes?.status);
+              console.log('agentmail attachment res:', agentmailRes?.status);
             } catch (mailErr) {
-              console.log('agentmail send error:', mailErr?.response?.data || mailErr.message);
+              console.log('agentmail attachment error:', JSON.stringify(mailErr?.response?.data || mailErr.message));
+              // Retry without attachments
+              try {
+                await axios.post(
+                  `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
+                  { to: recipients, subject: params.subject, body_text: params.text || 'Your document has been signed.' },
+                  { headers: { Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`, 'Content-Type': 'application/json' } }
+                );
+                console.log('agentmail fallback (no attachment) sent');
+              } catch (e2) {
+                console.log('agentmail fallback also failed:', e2?.response?.data || e2.message);
+              }
             }
             if (extUserId) { await updateMailCount(extUserId); }
             cleanupPaths.forEach(file => safeUnlink(file.path, file.label));
