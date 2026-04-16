@@ -500,10 +500,12 @@ async function PDF(req) {
             const { backupToDrive } = await import('../gdriveBackup.js');
             const signedPdfBuffer = fs.readFileSync(signedFilePath);
             const primarySigner = _resDoc.Signers?.[0] || signUser;
+            const signerName = primarySigner?.Name || signUser?.Name || 'Unknown';
+            const docName = _resDoc?.Name || 'Signed Document';
             backupToDrive({
               docId: req.params.docId,
-              documentName: _resDoc?.Name || 'Signed Document',
-              signerName: primarySigner?.Name || signUser?.Name || 'Unknown',
+              documentName: docName,
+              signerName,
               signerEmail: primarySigner?.Email || signUser?.Email || '',
               pdfBuffer: signedPdfBuffer,
               metadata: {
@@ -514,9 +516,27 @@ async function PDF(req) {
                 senderName: _resDoc?.SenderName,
                 senderMail: _resDoc?.SenderMail,
               },
-            }).catch(err => console.log('[gdrive-backup] Error:', err?.message));
+            }).catch(async (err) => {
+              const errMsg = err?.response?.data?.error?.message || err?.message || String(err);
+              console.error('[gdrive-backup] FAILED:', errMsg);
+              // Alert admins via email
+              try {
+                const alertAddr = process.env.GDRIVE_BACKUP_ALERT_EMAIL || 'leo@getcleverpet.com';
+                await axios.post(
+                  `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
+                  {
+                    to: [alertAddr],
+                    subject: `[sign.fluent.pet] Drive backup failed: ${docName}`,
+                    body_text: `Google Drive backup failed for signed document.\n\nDocument: ${docName}\nSigner: ${signerName}\nDoc ID: ${req.params.docId}\nError: ${errMsg}\nTime: ${new Date().toISOString()}\n\nThe document was signed successfully — only the Drive backup failed.\nThe signed PDF is still on the Render disk and accessible via the app.`,
+                  },
+                  { headers: { Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`, 'Content-Type': 'application/json' } }
+                );
+              } catch (mailErr) {
+                console.error('[gdrive-backup] Could not send alert email:', mailErr?.message);
+              }
+            });
           } catch (err) {
-            console.log('[gdrive-backup] Setup error:', err?.message);
+            console.error('[gdrive-backup] Setup error:', err?.message);
           }
         } else {
           unlinkFile(pfxname);
