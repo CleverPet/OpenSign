@@ -495,6 +495,29 @@ async function PDF(req) {
             doc.DocumentHash = hashForDoc;
           }
           sendMailsaveCertifcate(doc, pfx, isCustomMail, mailProvider, `signed_${name}`);
+          // Backup signed document to Google Drive (async, non-blocking)
+          try {
+            const { backupToDrive } = await import('../gdriveBackup.js');
+            const signedPdfBuffer = fs.readFileSync(signedFilePath);
+            const primarySigner = _resDoc.Signers?.[0] || signUser;
+            backupToDrive({
+              docId: req.params.docId,
+              documentName: _resDoc?.Name || 'Signed Document',
+              signerName: primarySigner?.Name || signUser?.Name || 'Unknown',
+              signerEmail: primarySigner?.Email || signUser?.Email || '',
+              pdfBuffer: signedPdfBuffer,
+              metadata: {
+                signers: _resDoc.Signers,
+                auditTrail: updatedDoc.AuditTrail,
+                documentHash: hashForDoc,
+                templateId: _resDoc?.TemplateId?.objectId,
+                senderName: _resDoc?.SenderName,
+                senderMail: _resDoc?.SenderMail,
+              },
+            }).catch(err => console.log('[gdrive-backup] Error:', err?.message));
+          } catch (err) {
+            console.log('[gdrive-backup] Setup error:', err?.message);
+          }
         } else {
           unlinkFile(pfxname);
         }
