@@ -19,7 +19,6 @@ export default async function googleLogin(request) {
     throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Invalid Google id_token');
   }
 
-  // Verify the token was issued for our client
   const expectedClientId = process.env.GOOGLE_CLIENT_ID;
   if (expectedClientId && tokenInfo.aud !== expectedClientId) {
     throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Token was not issued for this application');
@@ -30,9 +29,8 @@ export default async function googleLogin(request) {
   }
 
   const email = tokenInfo.email.toLowerCase();
-  const name = tokenInfo.name || '';
+  const name = tokenInfo.name || email.split('@')[0];
 
-  // Restrict to allowed domain
   const allowedDomain = process.env.GOOGLE_SSO_ALLOWED_DOMAIN;
   if (allowedDomain && !email.endsWith(`@${allowedDomain}`)) {
     throw new Parse.Error(
@@ -41,16 +39,14 @@ export default async function googleLogin(request) {
     );
   }
 
-  // Find existing user by email
+  // Find or create the Parse _User
   const userQuery = new Parse.Query(Parse.User);
   userQuery.equalTo('email', email);
   let user = await userQuery.first({ useMasterKey: true });
 
-  // Generate a one-time password for session creation
   const tempPassword = crypto.randomBytes(32).toString('hex');
 
   if (!user) {
-    // Create new user
     user = new Parse.User();
     user.set('username', email);
     user.set('email', email);
@@ -58,13 +54,53 @@ export default async function googleLogin(request) {
     user.set('emailVerified', true);
     user.set('password', tempPassword);
     await user.signUp(null, { useMasterKey: true });
+    console.log('Created new Parse user for', email);
   } else {
-    // Set temp password on existing user so we can log in
     user.set('password', tempPassword);
     if (!user.get('emailVerified')) {
       user.set('emailVerified', true);
     }
     await user.save(null, { useMasterKey: true });
+  }
+
+  // Ensure contracts_Users entry exists (required by thirdpartyLoginfn / getUserDetails)
+  const ExtUsers = Parse.Object.extend('contracts_Users');
+  const extQuery = new Parse.Query(ExtUsers);
+  extQuery.equalTo('UserId', {
+    __type: 'Pointer',
+    className: '_User',
+    objectId: user.id,
+  });
+  let extUser = await extQuery.first({ useMasterKey: true });
+
+  if (!extUser) {
+    // Find an existing tenant to link to (use the first one — single-tenant deployment)
+    const Tenant = Parse.Object.extend('partners_Tenant');
+    const tenantQuery = new Parse.Query(Tenant);
+    tenantQuery.ascending('createdAt');
+    let tenant = await tenantQuery.first({ useMasterKey: true });
+
+    if (!tenant) {
+      // No tenant exists — create one for this user
+      tenant = new Tenant();
+      tenant.set('UserId', { __type: 'Pointer', className: '_User', objectId: user.id });
+      tenant.set('TenantName', 'FluentPet');
+      tenant.set('EmailAddress', email);
+      tenant.set('IsActive', true);
+      tenant.set('CreatedBy', { __type: 'Pointer', className: '_User', objectId: user.id });
+      await tenant.save(null, { useMasterKey: true });
+      console.log('Created new tenant for', email);
+    }
+
+    // Create contracts_Users entry with Admin role (all @getcleverpet.com users are full admins)
+    extUser = new ExtUsers();
+    extUser.set('UserId', { __type: 'Pointer', className: '_User', objectId: user.id });
+    extUser.set('UserRole', 'contracts_Admin');
+    extUser.set('Email', email);
+    extUser.set('Name', name);
+    extUser.set('TenantId', { __type: 'Pointer', className: 'partners_Tenant', objectId: tenant.id });
+    await extUser.save(null, { useMasterKey: true });
+    console.log('Created contracts_Users entry for', email);
   }
 
   // Log in with the temp password to create a proper session
