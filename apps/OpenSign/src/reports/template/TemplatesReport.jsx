@@ -359,6 +359,11 @@ const TemplatesReport = (props) => {
       }
       setIsShareWith({ [item.objectId]: true });
     }
+    else if (act.action === "publiclink") {
+      const publicUrl = `${window.location.origin}/public/sign/${item.objectId}`;
+      copytoData(publicUrl);
+      showAlert("success", "Public signing link copied to clipboard", 3000);
+    }
     else if (act.action === "duplicate") {
       const hasDuplicate = utils.hasDuplicateWidgetNames(item?.Placeholders);
       if (hasDuplicate) {

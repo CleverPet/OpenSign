@@ -493,6 +493,14 @@ export default function reportJson(id) {
               action: "rename"
             },
             {
+              btnId: "1934",
+              btnLabel: "Public Link",
+              hoverLabel: "Public Link",
+              btnIcon: "fa-light fa-link",
+              redirectUrl: "",
+              action: "publiclink"
+            },
+            {
               btnId: "1834",
               btnLabel: "Delete",
               hoverLabel: "Delete",
