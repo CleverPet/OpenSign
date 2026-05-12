@@ -494,8 +494,8 @@ export default function reportJson(id) {
             },
             {
               btnId: "1934",
-              btnLabel: "Public Link",
-              hoverLabel: "Public Link",
+              btnLabel: "Copy Public URL",
+              hoverLabel: "Copy Public URL",
               btnIcon: "fa-light fa-link",
               redirectUrl: "",
               action: "publiclink"
