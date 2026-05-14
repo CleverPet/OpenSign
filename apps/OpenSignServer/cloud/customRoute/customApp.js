@@ -11,7 +11,7 @@ import { deleteUserOtp } from './deleteAccount/deleteUserOtp.js';
 export const app = express();
 
 dotenv.config({ quiet: true });
-app.use(cors());
+app.use(cors({ origin: ['https://sign.fluent.pet'] }));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 

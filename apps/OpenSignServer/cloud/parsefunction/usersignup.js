@@ -42,6 +42,7 @@ async function saveUser(userDetails) {
   }
 }
 export default async function usersignup(request) {
+  throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Signup disabled — use Google SSO');
   const userDetails = request.params.userDetails;
 
   try {

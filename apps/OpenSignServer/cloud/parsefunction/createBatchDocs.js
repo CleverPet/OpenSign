@@ -51,7 +51,7 @@ async function sendOwnerSummaryEmail({
 }) {
   try {
     const url = `${serverUrl}/functions/sendmailv3`;
-    const headers = { 'Content-Type': 'application/json', 'X-Parse-Application-Id': appId };
+    const headers = { 'Content-Type': 'application/json', 'X-Parse-Application-Id': appId, 'X-Parse-Master-Key': process.env.MASTER_KEY };
 
     const subject = `Bulk send finished: ${failed} of ${total} failed to create`;
 
@@ -124,7 +124,7 @@ async function sendMail(document, publicUrl) {
   for (let i = 0; i < signerMail.length; i++) {
     try {
       let url = `${serverUrl}/functions/sendmailv3`;
-      const headers = { 'Content-Type': 'application/json', 'X-Parse-Application-Id': appId };
+      const headers = { 'Content-Type': 'application/json', 'X-Parse-Application-Id': appId, 'X-Parse-Master-Key': process.env.MASTER_KEY };
       const objectId = signerMail[i]?.signerObjId;
       const hostUrl = baseUrl.origin;
       let encodeBase64;

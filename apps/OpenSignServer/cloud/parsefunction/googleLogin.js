@@ -20,7 +20,10 @@ export default async function googleLogin(request) {
   }
 
   const expectedClientId = process.env.GOOGLE_CLIENT_ID;
-  if (expectedClientId && tokenInfo.aud !== expectedClientId) {
+  if (!expectedClientId) {
+    throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, 'GOOGLE_CLIENT_ID not configured');
+  }
+  if (tokenInfo.aud !== expectedClientId) {
     throw new Parse.Error(Parse.Error.VALIDATION_ERROR, 'Token was not issued for this application');
   }
 
@@ -32,7 +35,10 @@ export default async function googleLogin(request) {
   const name = tokenInfo.name || email.split('@')[0];
 
   const allowedDomain = process.env.GOOGLE_SSO_ALLOWED_DOMAIN;
-  if (allowedDomain && !email.endsWith(`@${allowedDomain}`)) {
+  if (!allowedDomain) {
+    throw new Parse.Error(Parse.Error.INTERNAL_SERVER_ERROR, 'GOOGLE_SSO_ALLOWED_DOMAIN not configured');
+  }
+  if (!email.endsWith(`@${allowedDomain}`)) {
     throw new Parse.Error(
       Parse.Error.OPERATION_FORBIDDEN,
       `Only @${allowedDomain} accounts are allowed`

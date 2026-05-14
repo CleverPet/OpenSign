@@ -122,6 +122,9 @@ async function sendMailProvider(req) {
 }
 
 async function sendmailv3(req) {
+  if (!req.user && !req.master) {
+    throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User is not authenticated.');
+  }
   const nonCustomMail = await sendMailProvider(req);
   return nonCustomMail;
 }

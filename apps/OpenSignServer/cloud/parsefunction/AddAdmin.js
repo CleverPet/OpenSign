@@ -97,6 +97,7 @@ async function saveUser(userDetails) {
   }
 }
 export default async function AddAdmin(request) {
+  throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin creation disabled — use Google SSO');
   const userDetails = request.params.userDetails;
   const user = await saveUser(userDetails);
 
