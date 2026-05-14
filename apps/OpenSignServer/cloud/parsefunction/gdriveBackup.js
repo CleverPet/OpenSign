@@ -1,14 +1,18 @@
 import axios from 'axios';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 
 /**
  * Backs up signed documents to Google Drive.
  *
+ * Auth: uses a GCP service account (no token expiry).
  * Env vars required:
- *   GDRIVE_CLIENT_ID, GDRIVE_CLIENT_SECRET, GDRIVE_REFRESH_TOKEN
- *   GDRIVE_MAIN_FOLDER_ID       — root of A-Z entity folders (main archive)
- *   GDRIVE_AFFILIATE_FOLDER_ID  — root of A-Z entity folders (affiliate-only shortcuts)
- *   GDRIVE_SHARED_DRIVE_ID      — (optional) shared drive ID if folders are in a shared drive
+ *   GDRIVE_SA_KEY              — JSON string of the service account key file
+ *   GDRIVE_MAIN_FOLDER_ID     — root of A-Z entity folders (main archive)
+ *   GDRIVE_AFFILIATE_FOLDER_ID — root of A-Z entity folders (affiliate-only shortcuts)
+ *   GDRIVE_SHARED_DRIVE_ID    — (optional) shared drive ID if folders are in a shared drive
+ *
+ * Falls back to legacy OAuth (GDRIVE_CLIENT_ID/SECRET/REFRESH_TOKEN) if GDRIVE_SA_KEY is not set.
  *
  * Behavior: append-only. Never deletes or modifies existing files/folders.
  *   Folder structure: {root}/{LETTER}/{Last, First}/{YYYY-MM-DD Last, First AgreementName [v]}/
@@ -19,10 +23,44 @@ import fs from 'node:fs';
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
+function buildServiceAccountJwt(saKey) {
+  const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url');
+  const now = Math.floor(Date.now() / 1000);
+  const payload = Buffer.from(JSON.stringify({
+    iss: saKey.client_email,
+    scope: 'https://www.googleapis.com/auth/drive',
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+  })).toString('base64url');
+  const signingInput = `${header}.${payload}`;
+  const signature = crypto.sign('RSA-SHA256', Buffer.from(signingInput), saKey.private_key);
+  return `${signingInput}.${signature.toString('base64url')}`;
+}
+
 async function getAccessToken() {
   if (cachedToken && Date.now() < tokenExpiresAt - 60_000) {
     return cachedToken;
   }
+
+  // Prefer service account auth (never expires)
+  if (process.env.GDRIVE_SA_KEY) {
+    const saKey = JSON.parse(process.env.GDRIVE_SA_KEY);
+    const jwt = buildServiceAccountJwt(saKey);
+    const { data } = await axios.post(
+      'https://oauth2.googleapis.com/token',
+      new URLSearchParams({
+        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+        assertion: jwt,
+      }).toString(),
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }
+    );
+    cachedToken = data.access_token;
+    tokenExpiresAt = Date.now() + data.expires_in * 1000;
+    return cachedToken;
+  }
+
+  // Legacy fallback: OAuth refresh token
   const { data } = await axios.post(
     'https://oauth2.googleapis.com/token',
     new URLSearchParams({
