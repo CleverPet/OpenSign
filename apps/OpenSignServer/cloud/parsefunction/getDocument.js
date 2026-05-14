@@ -28,6 +28,30 @@ export default async function getDocument(request) {
           delete document.ExtUserPtr.TenantId.FileAdapters;
           delete document?.ExtUserPtr?.TenantId?.PfxFile;
           if (!IsEnableOTP) {
+            // Unauthenticated guest access: strip sensitive fields
+            if (document.ExtUserPtr) {
+              document.ExtUserPtr = {
+                objectId: document.ExtUserPtr.objectId,
+                SignatureType: document.ExtUserPtr.SignatureType,
+                UserId: document.ExtUserPtr.UserId ? { objectId: document.ExtUserPtr.UserId.objectId } : undefined,
+                Email: document.ExtUserPtr.Email,
+                Phone: document.ExtUserPtr.Phone,
+                Name: document.ExtUserPtr.Name,
+                Company: document.ExtUserPtr.Company,
+                HeaderDocId: document.ExtUserPtr.HeaderDocId,
+                DownloadFilenameFormat: document.ExtUserPtr.DownloadFilenameFormat,
+              };
+            }
+            if (document.AuditTrail && Array.isArray(document.AuditTrail)) {
+              document.AuditTrail = document.AuditTrail.map(entry => ({
+                Activity: entry.Activity,
+                UserPtr: entry.UserPtr ? { objectId: entry.UserPtr.objectId } : undefined,
+                createdAt: entry.createdAt,
+              }));
+            }
+            delete document.Note;
+            delete document.Bcc;
+            delete document.CreatedBy;
             return document;
           } else {
             if (sessiontoken) {

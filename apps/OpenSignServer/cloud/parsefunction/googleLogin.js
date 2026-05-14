@@ -98,15 +98,21 @@ export default async function googleLogin(request) {
       console.log('Created new tenant for', email);
     }
 
-    // Create contracts_Users entry with Admin role (all @getcleverpet.com users are full admins)
+    // Create contracts_Users entry — default role is User, not Admin
     extUser = new ExtUsers();
     extUser.set('UserId', { __type: 'Pointer', className: '_User', objectId: user.id });
-    extUser.set('UserRole', 'contracts_Admin');
+    extUser.set('UserRole', 'contracts_User');
     extUser.set('Email', email);
     extUser.set('Name', name);
     extUser.set('TenantId', { __type: 'Pointer', className: 'partners_Tenant', objectId: tenant.id });
+    const extAcl = new Parse.ACL();
+    extAcl.setPublicReadAccess(true);
+    extAcl.setPublicWriteAccess(false);
+    extAcl.setReadAccess(user.id, true);
+    extAcl.setWriteAccess(user.id, true);
+    extUser.setACL(extAcl);
     await extUser.save(null, { useMasterKey: true });
-    console.log('Created contracts_Users entry for', email);
+    console.log('Created contracts_Users entry for', email, '(role: contracts_User)');
   }
 
   // Log in with the temp password to create a proper session

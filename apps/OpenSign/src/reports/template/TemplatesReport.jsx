@@ -363,6 +363,12 @@ const TemplatesReport = (props) => {
       const publicUrl = `${window.location.origin}/public/sign/${item.objectId}`;
       copytoData(publicUrl);
       showAlert("success", "Public signing link copied to clipboard", 3000);
+      // Mark template as public so the link works
+      const Template = Parse.Object.extend("contracts_Template");
+      const tmpl = new Template();
+      tmpl.id = item.objectId;
+      tmpl.set("IsPublic", true);
+      await tmpl.save(null, { sessionToken: localStorage.getItem("accesstoken") }).catch(() => {});
     }
     else if (act.action === "duplicate") {
       const hasDuplicate = utils.hasDuplicateWidgetNames(item?.Placeholders);
@@ -521,7 +527,7 @@ const TemplatesReport = (props) => {
       await axios.put(
         serverUrl + "classes/contracts_Users/" + extUserId,
         { TourStatus: updatedTourStatus },
-        { headers: { "X-Parse-Application-Id": appId } }
+        { headers: { "X-Parse-Application-Id": appId, "X-Parse-Session-Token": localStorage.getItem("accesstoken") } }
       );
     }
   };

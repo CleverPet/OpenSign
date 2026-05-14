@@ -62,9 +62,10 @@ export default async function addUser(request) {
           extUser.set('UserId', user);
           const acl = new Parse.ACL();
           acl.setPublicReadAccess(true);
-          acl.setPublicWriteAccess(true);
+          acl.setPublicWriteAccess(false);
           acl.setReadAccess(request.user.id, true);
           acl.setWriteAccess(request.user.id, true);
+          acl.setWriteAccess(user.id, true);
           extUser.setACL(acl);
           const extUserRes = await extUser.save();
 
@@ -83,10 +84,10 @@ export default async function addUser(request) {
           extUser.set('UserId', { __type: 'Pointer', className: '_User', objectId: userRes.id });
           const acl = new Parse.ACL();
           acl.setPublicReadAccess(true);
-          acl.setPublicWriteAccess(true);
+          acl.setPublicWriteAccess(false);
           acl.setReadAccess(request.user.id, true);
           acl.setWriteAccess(request.user.id, true);
-
+          acl.setWriteAccess(userRes.id, true);
           extUser.setACL(acl);
           const res = await extUser.save();
 

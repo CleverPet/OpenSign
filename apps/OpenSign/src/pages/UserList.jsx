@@ -239,9 +239,33 @@ const UserList = () => {
   };
 
   const handleActionBtn = withSessionValidation(async (act, item) => {
-      setIsActModal({ [`${act.action}_${item.objectId}`]: true });
+    if (act.action === "togglerole") {
+      setIsActLoader({ [item.objectId]: true });
+      try {
+        const newRole = item?.UserRole === "contracts_Admin" ? "contracts_User" : "contracts_Admin";
+        const extUser = new Parse.Object("contracts_Users");
+        extUser.id = item.objectId;
+        extUser.set("UserRole", newRole);
+        await extUser.save(null, { sessionToken: localStorage.getItem("accesstoken") });
+        setUserList(prev => prev.map(u =>
+          u.objectId === item.objectId ? { ...u, UserRole: newRole } : u
+        ));
+        showAlert("success", `${item.Name} is now ${newRole.split("_").pop()}`);
+      } catch (err) {
+        console.error("toggle role error", err);
+        showAlert("danger", t("something-went-wrong-mssg"));
+      } finally {
+        setIsActLoader({});
+      }
+      return;
+    }
+    setIsActModal({ [`${act.action}_${item.objectId}`]: true });
   });
   const handleBtnVisibility = (act, item) => {
+    if (act.action === "togglerole") {
+      // Show for all users except self (prevent self-demotion)
+      return item?.objectId !== extClass?.[0]?.objectId;
+    }
     if (act.restrictAdmin) {
       if (item?.UserRole === "contracts_Admin") {
         return false;
@@ -422,9 +446,10 @@ const UserList = () => {
                                               onClick={() =>
                                                 handleActionBtn(act, item)
                                               }
-                                              title={t(
-                                                `btnLabel.${act.hoverLabel}`
-                                              )}
+                                              title={act.action === "togglerole"
+                                                ? (item?.UserRole === "contracts_Admin" ? "Make User" : "Make Admin")
+                                                : t(`btnLabel.${act.hoverLabel}`)
+                                              }
                                               className={
                                                 act.action !== "option"
                                                   ? `${act?.btnColor || ""} op-btn op-btn-sm mr-1 `

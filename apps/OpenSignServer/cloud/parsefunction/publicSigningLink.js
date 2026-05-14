@@ -17,7 +17,7 @@ export async function getPublicTemplate(request) {
   const templateQuery = new Parse.Query('contracts_Template');
   const template = await templateQuery.get(templateId, { useMasterKey: true });
 
-  if (!template) {
+  if (!template || template.get('IsPublic') !== true) {
     throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Template not found');
   }
 
@@ -43,7 +43,7 @@ export async function createPublicSigningDoc(request) {
   templateQuery.include('CreatedBy');
   const template = await templateQuery.get(templateId, { useMasterKey: true });
 
-  if (!template) {
+  if (!template || template.get('IsPublic') !== true) {
     throw new Parse.Error(Parse.Error.OBJECT_NOT_FOUND, 'Template not found');
   }
 

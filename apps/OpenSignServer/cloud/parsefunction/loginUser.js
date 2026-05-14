@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 export default async function loginUser(request) {
+  throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Password login disabled — use Google SSO');
   const username = request.params.email;
   const password = request.params.password;
 

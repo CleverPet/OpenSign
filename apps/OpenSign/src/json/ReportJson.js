@@ -567,5 +567,13 @@ export const usersActions = [
     redirectUrl: "",
     action: "resetpassword",
     restrictAdmin: true
+  },
+  {
+    btnId: "2010",
+    hoverLabel: "Toggle role",
+    btnIcon: "fa-light fa-shield-halved",
+    redirectUrl: "",
+    action: "togglerole",
+    restrictAdmin: true
   }
 ];

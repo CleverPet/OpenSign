@@ -40,6 +40,7 @@ async function updateUserExceptAdmin(data) {
 
 // `UpdateExistUserAsAdmin` is used to create admin from exist user records and transfer to org of admin
 export default async function UpdateExistUserAsAdmin(request) {
+  throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin promotion disabled — use Google SSO');
   const email = request.params.email;
   const masterkey = request.params.masterkey;
   try {

@@ -1,5 +1,6 @@
 // `CheckAdminExist` is used to check is admin with org exist or not in db
 export default async function CheckAdminExist() {
+  throw new Parse.Error(Parse.Error.OPERATION_FORBIDDEN, 'Admin check disabled — use Google SSO');
   try {
     const extClsQuery = new Parse.Query('contracts_Users');
     extClsQuery.equalTo('UserRole', 'contracts_Admin');
