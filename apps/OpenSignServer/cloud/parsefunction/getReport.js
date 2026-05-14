@@ -46,25 +46,28 @@ export default async function getReport(request) {
           paramsObj = { ...paramsObj, CreatedBy: userPtr };
         }
         const _extUser = JSON.parse(JSON.stringify(extUser));
-        const extPtr = { __type: 'Pointer', className: 'contracts_Users', objectId: extUser.id };
-        if (_extUser?.TeamIds && _extUser.TeamIds?.length > 0) {
-          // Collect ancestors efficiently + de-dupe
-          const teamSet = new Set();
-          for (const team of _extUser?.TeamIds) {
-            const ancestors = team.Ancestors || [];
-            for (const a of ancestors) teamSet.add(a);
+        const isAdmin = _extUser?.UserRole === 'contracts_Admin' || _extUser?.UserRole === 'contracts_OrgAdmin';
+        // Admins see all templates in the org; regular users see only their own + shared
+        if (!isAdmin) {
+          const extPtr = { __type: 'Pointer', className: 'contracts_Users', objectId: extUser.id };
+          if (_extUser?.TeamIds && _extUser.TeamIds?.length > 0) {
+            const teamSet = new Set();
+            for (const team of _extUser?.TeamIds) {
+              const ancestors = team.Ancestors || [];
+              for (const a of ancestors) teamSet.add(a);
+            }
+            const teamArr = [...teamSet];
+            paramsObj = {
+              ...paramsObj,
+              $or: [
+                { SharedWith: { $in: teamArr } },
+                { ExtUserPtr: extPtr },
+                { SharedWithUsers: extPtr },
+              ],
+            };
+          } else {
+            paramsObj = { ...paramsObj, CreatedBy: userPtr };
           }
-          const teamArr = [...teamSet];
-          paramsObj = {
-            ...paramsObj,
-            $or: [
-              { SharedWith: { $in: teamArr } },
-              { ExtUserPtr: extPtr },
-              { SharedWithUsers: extPtr },
-            ],
-          };
-        } else {
-          paramsObj = { ...paramsObj, CreatedBy: userPtr };
         }
       }
       paramsObj = applySearch({ reportId, baseWhere: paramsObj, searchTerm });
