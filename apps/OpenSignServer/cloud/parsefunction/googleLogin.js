@@ -98,6 +98,15 @@ export default async function googleLogin(request) {
       console.log('Created new tenant for', email);
     }
 
+    // Find existing org and default team (single-tenant deployment)
+    const orgQuery = new Parse.Query('contracts_Organizations');
+    orgQuery.ascending('createdAt');
+    const org = await orgQuery.first({ useMasterKey: true });
+
+    const teamQuery = new Parse.Query('contracts_Teams');
+    teamQuery.equalTo('Name', 'All Users');
+    const defaultTeam = await teamQuery.first({ useMasterKey: true });
+
     // Create contracts_Users entry — default role is User, not Admin
     extUser = new ExtUsers();
     extUser.set('UserId', { __type: 'Pointer', className: '_User', objectId: user.id });
@@ -105,6 +114,12 @@ export default async function googleLogin(request) {
     extUser.set('Email', email);
     extUser.set('Name', name);
     extUser.set('TenantId', { __type: 'Pointer', className: 'partners_Tenant', objectId: tenant.id });
+    if (org) {
+      extUser.set('OrganizationId', { __type: 'Pointer', className: 'contracts_Organizations', objectId: org.id });
+    }
+    if (defaultTeam) {
+      extUser.set('TeamIds', [{ __type: 'Pointer', className: 'contracts_Teams', objectId: defaultTeam.id }]);
+    }
     const extAcl = new Parse.ACL();
     extAcl.setPublicReadAccess(true);
     extAcl.setPublicWriteAccess(false);
