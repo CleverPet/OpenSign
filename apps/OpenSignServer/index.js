@@ -12,6 +12,7 @@ import { ApiPayloadConverter } from 'parse-server-api-mail-adapter';
 import S3Adapter from '@parse/s3-files-adapter';
 import FSFilesAdapter from '@parse/fs-files-adapter';
 import { app as customRoute } from './cloud/customRoute/customApp.js';
+import { rateLimitMiddleware } from './cloud/parsefunction/rateLimiter.js';
 import { exec } from 'child_process';
 import { createTransport } from 'nodemailer';
 import { appName, cloudServerUrl, serverAppId, smtpenable, smtpsecure, useLocal } from './Utils.js';
@@ -212,6 +213,9 @@ app.use(async function (req, res, next) {
     next();
   }
 });
+
+// Rate limiting (must be after getUserIP middleware)
+app.use(rateLimitMiddleware);
 
 // Serve static assets from the /public folder
 app.use('/public', express.static(path.join(__dirname, '/public')));

@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { rateLimitMiddleware } from '../parsefunction/rateLimiter.js';
 
 import docxtopdf, { upload as docxUpload } from './docxtopdf.js';
 import decryptpdf, { upload as decryptUpload } from './decryptpdf.js';
@@ -14,6 +15,7 @@ dotenv.config({ quiet: true });
 app.use(cors({ origin: ['https://sign.fluent.pet'] }));
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
+app.use(rateLimitMiddleware);
 
 app.post('/docxtopdf', docxUpload.single('file'), docxtopdf);
 app.post('/decryptpdf', decryptUpload.single('file'), decryptpdf);
