@@ -2,19 +2,24 @@ import { RateLimiterMemory } from 'rate-limiter-flexible';
 
 const WINDOW = 15 * 60; // 15 minutes in seconds
 
-// Strict limits for auth and email endpoints
+// Limits target abusive patterns, not normal app usage.
+// Authenticated requests bypass the general limiter — the UI fires many
+// background calls (status checks, polling, navigation) that would otherwise
+// exhaust per-IP budgets and cause spurious logouts.
 const authLimiter = new RateLimiterMemory({ points: 10, duration: WINDOW });
 const otpSendLimiter = new RateLimiterMemory({ points: 5, duration: WINDOW });
 const otpVerifyLimiter = new RateLimiterMemory({ points: 10, duration: WINDOW });
-const emailLimiter = new RateLimiterMemory({ points: 30, duration: WINDOW });
+const emailLimiter = new RateLimiterMemory({ points: 100, duration: WINDOW });
 const publicSignLimiter = new RateLimiterMemory({ points: 10, duration: WINDOW });
 const publicTemplateLimiter = new RateLimiterMemory({ points: 30, duration: WINDOW });
-const signPdfLimiter = new RateLimiterMemory({ points: 10, duration: WINDOW });
-const fileConvertLimiter = new RateLimiterMemory({ points: 10, duration: WINDOW });
+const signPdfLimiter = new RateLimiterMemory({ points: 20, duration: WINDOW });
+const fileConvertLimiter = new RateLimiterMemory({ points: 20, duration: WINDOW });
 const deleteAccountLimiter = new RateLimiterMemory({ points: 5, duration: WINDOW });
-const generalLimiter = new RateLimiterMemory({ points: 100, duration: WINDOW });
+// General limiter only applies to UNAUTHENTICATED requests — high enough that
+// normal browsing isn't blocked, low enough to deter scraping/abuse.
+const generalLimiter = new RateLimiterMemory({ points: 300, duration: WINDOW });
 
-// Map URL path suffixes to specific limiters
+// Map URL path suffixes to specific limiters (these always apply)
 const FUNCTION_LIMITERS = {
   'googleLogin': authLimiter,
   'loginuser': authLimiter,
@@ -33,16 +38,16 @@ const PATH_LIMITERS = {
   '/decryptpdf': fileConvertLimiter,
 };
 
-function getLimiter(req) {
+function getSpecificLimiter(req) {
   const path = req.path || '';
 
-  // Check cloud function name: /app/functions/<name> or /functions/<name>
+  // Cloud function endpoints: /app/functions/<name> or /functions/<name>
   const funcMatch = path.match(/\/functions\/(\w+)$/);
   if (funcMatch) {
-    return FUNCTION_LIMITERS[funcMatch[1]] || generalLimiter;
+    return FUNCTION_LIMITERS[funcMatch[1]] || null;
   }
 
-  // Check custom route paths
+  // Custom Express routes
   for (const [prefix, limiter] of Object.entries(PATH_LIMITERS)) {
     if (path.startsWith(prefix)) return limiter;
   }
@@ -50,17 +55,30 @@ function getLimiter(req) {
   // Delete account paths
   if (path.includes('/delete-account')) return deleteAccountLimiter;
 
-  return generalLimiter;
+  return null;
+}
+
+function hasSessionToken(req) {
+  return Boolean(
+    req.headers['x-parse-session-token'] ||
+    req.headers['sessiontoken'] ||
+    req.headers['session-token']
+  );
 }
 
 export async function rateLimitMiddleware(req, res, next) {
-  // Skip rate limiting for internal localhost calls (cloud function → cloud function)
+  // Skip internal localhost calls (cloud function → cloud function via master key)
   const ip = req.headers['x-real-ip'] || req.ip || '127.0.0.1';
   if (ip === '127.0.0.1' || ip === '::1') {
     return next();
   }
 
-  const limiter = getLimiter(req);
+  const specific = getSpecificLimiter(req);
+  const limiter = specific || (hasSessionToken(req) ? null : generalLimiter);
+
+  // Authenticated requests without a specific abuse-vector endpoint pass through
+  if (!limiter) return next();
+
   try {
     await limiter.consume(ip);
     next();
