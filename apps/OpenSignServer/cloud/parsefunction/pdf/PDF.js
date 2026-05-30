@@ -527,7 +527,7 @@ async function PDF(req) {
                   {
                     to: [alertAddr],
                     subject: `[sign.fluent.pet] Drive backup failed: ${docName}`,
-                    body_text: `Google Drive backup failed for signed document.\n\nDocument: ${docName}\nSigner: ${signerName}\nDoc ID: ${req.params.docId}\nError: ${errMsg}\nTime: ${new Date().toISOString()}\n\nThe document was signed successfully — only the Drive backup failed.\nThe signed PDF is still on the Render disk and accessible via the app.`,
+                    text: `Google Drive backup failed for signed document.\n\nDocument: ${docName}\nSigner: ${signerName}\nDoc ID: ${req.params.docId}\nError: ${errMsg}\nTime: ${new Date().toISOString()}\n\nThe document was signed successfully — only the Drive backup failed.\nThe signed PDF is still on the Render disk and accessible via the app.`,
                   },
                   { headers: { Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`, 'Content-Type': 'application/json' } }
                 );

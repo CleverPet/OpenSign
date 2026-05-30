@@ -84,8 +84,8 @@ async function sendMailProvider(req) {
         {
           to: recipients,
           subject: req.params.subject,
-          body_text: req.params.text || '',
-          body_html: req.params?.html ? req.params.html + reportMsg : undefined,
+          text: req.params.text || '',
+          html: req.params?.html ? req.params.html + reportMsg : undefined,
         },
         {
           headers: {

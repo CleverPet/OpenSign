@@ -189,8 +189,8 @@ async function sendMailProvider(params) {
                 {
                   to: recipients,
                   subject: params.subject,
-                  body_text: params.text || 'Your document has been signed.',
-                  body_html: params?.html ? params.html + reportMsg : undefined,
+                  text: params.text || 'Your document has been signed.',
+                  html: params?.html ? params.html + reportMsg : undefined,
                   attachments: agentAttachments,
                 },
                 { headers: { Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`, 'Content-Type': 'application/json' } }
@@ -202,7 +202,7 @@ async function sendMailProvider(params) {
               try {
                 await axios.post(
                   `https://api.agentmail.to/v0/inboxes/${process.env.AGENTMAIL_INBOX_ID}/messages/send`,
-                  { to: recipients, subject: params.subject, body_text: params.text || 'Your document has been signed.' },
+                  { to: recipients, subject: params.subject, text: params.text || 'Your document has been signed.' },
                   { headers: { Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`, 'Content-Type': 'application/json' } }
                 );
                 console.log('agentmail fallback (no attachment) sent');
@@ -266,8 +266,8 @@ async function sendMailProvider(params) {
           {
             to: rcpts2,
             subject: params.subject,
-            body_text: params.text || '',
-            body_html: params?.html ? params.html + reportMsg : undefined,
+            text: params.text || '',
+            html: params?.html ? params.html + reportMsg : undefined,
           },
           { headers: { Authorization: `Bearer ${process.env.AGENTMAIL_API_KEY}`, 'Content-Type': 'application/json' } }
         );
