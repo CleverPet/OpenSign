@@ -122,7 +122,22 @@ async function sendMailProvider(req) {
 }
 
 async function sendmailv3(req) {
-  if (!req.user && !req.master) {
+  // Accept Parse-recognized session (req.user/req.master) OR the legacy
+  // lowercase `sessiontoken` header that the OpenSign frontend sends.
+  let authed = Boolean(req.user || req.master);
+  if (!authed) {
+    const token = req.headers?.['sessiontoken'] || req.headers?.['x-parse-session-token'];
+    if (token) {
+      try {
+        const sessionQuery = new Parse.Query(Parse.Session);
+        sessionQuery.equalTo('sessionToken', token);
+        sessionQuery.include('user');
+        const session = await sessionQuery.first({ useMasterKey: true });
+        if (session && session.get('user')) authed = true;
+      } catch (_) { /* fall through */ }
+    }
+  }
+  if (!authed) {
     throw new Parse.Error(Parse.Error.INVALID_SESSION_TOKEN, 'User is not authenticated.');
   }
   const nonCustomMail = await sendMailProvider(req);
