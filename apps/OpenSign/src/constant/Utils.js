@@ -31,8 +31,8 @@ export function getEnv() {
 }
 const appName = "OpenSign™";
 
-export const defaultMailBody = `<p>Hi {{receiver_name}},</p><br><p>We hope this email finds you well. {{sender_name}}&nbsp;has requested you to review and sign&nbsp;{{document_title}}.</p><p>Your signature is crucial to proceed with the next steps as it signifies your agreement and authorization.</p><br><p><a href='{{signing_url}}' rel='noopener noreferrer' target='_blank'>Sign here</a></p><br><br><p>If you have any questions or need further clarification regarding the document or the signing process,  please contact the sender.</p><br><p>Thanks</p><p> Team ${appName}</p><br>`;
-export const defaultMailSubject = `{{sender_name}} has requested you to sign {{document_title}}`;
+export const defaultMailBody = `<p style="font-family:Arial,sans-serif;font-size:15px;color:#222;">Hi {{receiver_name}},</p><p style="font-family:Arial,sans-serif;font-size:15px;color:#222;">{{sender_name}} has sent you <strong>"{{document_title}}"</strong> for your signature.</p><p style="margin:28px 0;"><a href="{{signing_url}}" style="display:inline-block;padding:12px 28px;background-color:#3368ff;color:#ffffff;text-decoration:none;border-radius:6px;font-weight:600;font-family:Arial,sans-serif;font-size:15px;" target="_blank" rel="noopener noreferrer">Review and sign</a></p><p style="font-family:Arial,sans-serif;font-size:13px;color:#666;">Or paste this link into your browser:<br><a href="{{signing_url}}" style="color:#3368ff;word-break:break-all;">{{signing_url}}</a></p><p style="font-family:Arial,sans-serif;font-size:15px;color:#222;">This signing link expires on <strong>{{expiry_date}}</strong>.</p><p style="font-family:Arial,sans-serif;font-size:15px;color:#222;">Questions about the document? Reply to this email — it goes straight to {{sender_name}}.</p>`;
+export const defaultMailSubject = `{{sender_name}} has requested your signature on "{{document_title}}"`;
 export const nonPresentMaskCss = (base) => ({
   ...base,
   width: "0px",
