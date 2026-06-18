@@ -3,18 +3,23 @@ import axios from 'axios';
 /**
  * Lightweight error alerting for OpenSign cloud functions.
  *
- * Transport (first configured wins):
- *   1. SLACK_ALERT_WEBHOOK_URL  — Slack incoming-webhook URL (simplest, no scopes)
- *   2. SLACK_BOT_TOKEN + SLACK_ALERT_CHANNEL — chat.postMessage (bot must be in the channel)
- *   3. none — logs locally only (no-op transport, never throws)
+ * Transports (all configured ones fire; independent of each other):
+ *   - Email via AgentMail — ALERT_EMAIL + AGENTMAIL_API_KEY + AGENTMAIL_INBOX_ID
+ *     (reuses the same creds OpenSign already uses to send signing emails)
+ *   - Slack — SLACK_ALERT_WEBHOOK_URL, or SLACK_BOT_TOKEN + SLACK_ALERT_CHANNEL
+ *   - If nothing is configured, logs locally only.
  *
- * Designed to be fire-and-forget: callers do NOT await, and this never throws,
- * so alerting can never affect the request it is reporting on.
+ * Email is the primary always-on channel (no channel-membership gate). Slack is
+ * optional/secondary. Designed to be fire-and-forget: callers do NOT await, and
+ * this never throws, so alerting can never affect the request it reports on.
  */
 
 const WEBHOOK = () => process.env.SLACK_ALERT_WEBHOOK_URL;
 const BOT_TOKEN = () => process.env.SLACK_BOT_TOKEN;
 const CHANNEL = () => process.env.SLACK_ALERT_CHANNEL;
+const ALERT_EMAIL = () => process.env.ALERT_EMAIL;
+const AGENTMAIL_KEY = () => process.env.AGENTMAIL_API_KEY;
+const AGENTMAIL_INBOX = () => process.env.AGENTMAIL_INBOX_ID;
 const ENVNAME = () => process.env.NODE_ENV || process.env.RENDER_SERVICE_NAME || 'unknown';
 
 // In-memory throttle so a hot loop of the same error can't flood Slack.
@@ -52,35 +57,78 @@ function buildMessage(context, err) {
   );
 }
 
+function sendEmail(context, err) {
+  const to = ALERT_EMAIL();
+  const key = AGENTMAIL_KEY();
+  const inbox = AGENTMAIL_INBOX();
+  if (!to || !key || !inbox) return false;
+  const name = err?.name || 'Error';
+  const message = err?.message || String(err);
+  const stack = String(err?.stack || '').split('\n').slice(0, 8).join('\n');
+  const subject = `[OpenSign error] ${context?.fn || context?.path || 'cloud fn'}: ${name}`;
+  const text =
+    `OpenSign error (${ENVNAME()})\n\n` +
+    (context?.fn ? `fn: ${context.fn}\n` : '') +
+    (context?.docId ? `docId: ${context.docId}\n` : '') +
+    (context?.path ? `path: ${context.path}\n` : '') +
+    `\n${name}: ${message}\n\n${stack}\n`;
+  const html =
+    `<p><strong>OpenSign error</strong> (${ENVNAME()})</p>` +
+    `<ul>` +
+    (context?.fn ? `<li><strong>fn:</strong> <code>${context.fn}</code></li>` : '') +
+    (context?.docId ? `<li><strong>docId:</strong> <code>${context.docId}</code></li>` : '') +
+    (context?.path ? `<li><strong>path:</strong> <code>${context.path}</code></li>` : '') +
+    `</ul>` +
+    `<p><strong>${name}:</strong> ${message}</p>` +
+    `<pre style="background:#f5f5f5;padding:8px;border-radius:4px;font-size:12px;overflow:auto;">${stack.replace(/</g, '&lt;')}</pre>`;
+  axios
+    .post(
+      `https://api.agentmail.to/v0/inboxes/${inbox}/messages/send`,
+      { to: Array.isArray(to) ? to : [to], subject, text, html },
+      { headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' }, timeout: 8000 }
+    )
+    .catch(e => console.log('[alerting] email send failed:', e?.message));
+  return true;
+}
+
+function sendSlack(context, err) {
+  const webhook = WEBHOOK();
+  const botToken = BOT_TOKEN();
+  const channel = CHANNEL();
+  const text = buildMessage(context, err);
+  if (webhook) {
+    axios.post(webhook, { text }, { timeout: 5000 }).catch(e => {
+      console.log('[alerting] webhook post failed:', e?.message);
+    });
+    return true;
+  }
+  if (botToken && channel) {
+    axios
+      .post(
+        'https://slack.com/api/chat.postMessage',
+        { channel, text },
+        { headers: { Authorization: `Bearer ${botToken}` }, timeout: 5000 }
+      )
+      .then(r => {
+        if (r?.data && r.data.ok === false) console.log('[alerting] slack api error:', r.data.error);
+      })
+      .catch(e => console.log('[alerting] chat.postMessage failed:', e?.message));
+    return true;
+  }
+  return false;
+}
+
 export function reportError(context, err) {
   try {
     const key = `${context?.fn || context?.path || '?'}:${err?.message || String(err)}`;
     if (throttled(key)) return;
-    const text = buildMessage(context, err);
 
-    const webhook = WEBHOOK();
-    const botToken = BOT_TOKEN();
-    const channel = CHANNEL();
+    // All configured transports fire independently.
+    const emailed = sendEmail(context, err);
+    const slacked = sendSlack(context, err);
 
-    if (webhook) {
-      axios.post(webhook, { text }, { timeout: 5000 }).catch(e => {
-        console.log('[alerting] webhook post failed:', e?.message);
-      });
-    } else if (botToken && channel) {
-      axios
-        .post(
-          'https://slack.com/api/chat.postMessage',
-          { channel, text },
-          { headers: { Authorization: `Bearer ${botToken}` }, timeout: 5000 }
-        )
-        .then(r => {
-          if (r?.data && r.data.ok === false) {
-            console.log('[alerting] slack api error:', r.data.error);
-          }
-        })
-        .catch(e => console.log('[alerting] chat.postMessage failed:', e?.message));
-    } else {
-      console.log('[alerting] (no Slack configured) ' + text.replace(/\n/g, ' | '));
+    if (!emailed && !slacked) {
+      console.log('[alerting] (no transport configured) ' + buildMessage(context, err).replace(/\n/g, ' | '));
     }
   } catch (e) {
     // Alerting must never break the caller.
