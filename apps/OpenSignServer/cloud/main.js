@@ -65,6 +65,12 @@ import getSignature from './parsefunction/getSignature.js';
 import updateEmailTemplates from './parsefunction/updateEmailTemplates.js';
 import triggerEvent from './parsefunction/triggerEvent.js';
 import setWidgetPreferences from './parsefunction/setWidgetPreferences.js';
+import { installCloudErrorReporting } from './utils/alerting.js';
+
+// Install global cloud-function error reporting BEFORE any Parse.Cloud.define
+// calls so all functions are wrapped. Reports to Slack when a function throws
+// or returns a raw Error (the failure mode that hid the getDocument crash).
+installCloudErrorReporting(Parse);
 
 // This afterSave function triggers after an object is added or updated in the specified class, allowing for post-processing logic.
 Parse.Cloud.afterSave('contracts_Document', DocumentAftersave);
