@@ -25,7 +25,7 @@ export default async function getDocument(request) {
         if (res) {
           const IsEnableOTP = res?.get('IsEnableOTP') || false;
           const document = JSON.parse(JSON.stringify(res));
-          delete document.ExtUserPtr.TenantId.FileAdapters;
+          delete document?.ExtUserPtr?.TenantId?.FileAdapters;
           delete document?.ExtUserPtr?.TenantId?.PfxFile;
           if (!IsEnableOTP) {
             // Unauthenticated guest access: strip sensitive fields
